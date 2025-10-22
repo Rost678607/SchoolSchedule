@@ -4,8 +4,10 @@ import android.annotation.SuppressLint
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -27,6 +29,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.filled.AutoStories
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -36,9 +39,11 @@ import com.rostik.schoolapp.model.data.SpecificLesson
 import com.rostik.schoolapp.model.data.SpecificLessonManager
 import com.rostik.schoolapp.model.data.TimeScheme
 import com.rostik.schoolapp.model.data.TimeSchemeManager
+import kotlinx.coroutines.delay
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.launch
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
@@ -51,6 +56,9 @@ fun HomeScreen(navController: NavController = rememberNavController()) {
     val timeSchemeManager = remember { TimeSchemeManager(context) }
     val loaded = remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+    val timeUntilNext = remember { mutableStateOf("") }
+    val nextEventType = remember { mutableStateOf("") }
+    val relevantLesson = remember { mutableStateOf<SpecificLesson?>(null) }
 
     LaunchedEffect(Unit) {
         coroutineScope.launch {
@@ -59,6 +67,31 @@ fun HomeScreen(navController: NavController = rememberNavController()) {
             specificLessonManager.load()
             specificLessonManager.cleanInvalid(lessonManager)
             loaded.value = true
+        }
+    }
+
+    LaunchedEffect(loaded.value) {
+        if (loaded.value) {
+            while (true) {
+                val nowDate = LocalDate.now()
+                val nowTime = LocalTime.now()
+                val today = nowDate.dayOfWeek
+                val timeScheme = timeSchemeManager.getTimeScheme()
+                val specificLessonsToday = specificLessonManager.getSpecificLessonsForDay(today)
+                    .sortedBy { it.lessonNumber }
+
+                if (specificLessonsToday.isNotEmpty()) {
+                    val nextEvent = findNextEvent(specificLessonsToday, timeScheme, nowTime)
+                    timeUntilNext.value = nextEvent.first
+                    nextEventType.value = nextEvent.second
+                    relevantLesson.value = nextEvent.third
+                } else {
+                    timeUntilNext.value = "Отдыхай"
+                    nextEventType.value = ""
+                    relevantLesson.value = null
+                }
+                delay(1000L)
+            }
         }
     }
 
@@ -98,6 +131,56 @@ fun HomeScreen(navController: NavController = rememberNavController()) {
                 modifier = Modifier
                     .fillMaxSize()
             ) {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        if (nextEventType.value.isEmpty()) {
+                            Text(
+                                text = timeUntilNext.value,
+                                fontSize = 46.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            Text(
+                                text = "До ${nextEventType.value}:",
+                                fontSize = 26.sp,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            Text(
+                                text = timeUntilNext.value,
+                                fontSize = 46.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        relevantLesson.value?.let { specLesson ->
+                            val lesson = lessonManager.getLessonById(specLesson.lessonId)
+                            lesson?.let {
+                                Column {
+                                    Text(
+                                        text = it.name,
+                                        fontSize = 28.sp,
+                                        modifier = Modifier.padding(top = 8.dp)
+                                    )
+                                    Text(
+                                        text = specLesson.cabinet,
+                                        fontSize = 22.sp,
+                                        modifier = Modifier.padding(top = 6.dp)
+                                    )
+                                    Text(
+                                        text = specLesson.additionalInfo,
+                                        fontSize = 16.sp,
+                                        modifier = Modifier.padding(top = 6.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
                 item {
                     Card(
                         modifier = Modifier
@@ -155,7 +238,7 @@ fun HomeScreen(navController: NavController = rememberNavController()) {
                                 fontSize = 24.sp
                             )
                             val homeworkEntries = lessonManager.getAllLessons()
-                                .filter { !it.homework.isNullOrBlank() }
+                                .filter { it.homework.isNotBlank() }
                                 .mapNotNull { lesson ->
                                     val daysToNext = calculateDaysToNextLesson(lesson.id, specificLessonManager, nowDate, nowTime, timeScheme)
                                     if (daysToNext >= 0) lesson to daysToNext else null
@@ -179,6 +262,9 @@ fun HomeScreen(navController: NavController = rememberNavController()) {
                             }
                         }
                     }
+                }
+                item {
+                    Spacer(modifier = Modifier.height(84.dp))
                 }
             }
         }
@@ -241,4 +327,53 @@ private fun calculateDaysToNextLesson(
         }
     }
     return -1
+}
+
+@RequiresApi(Build.VERSION_CODES.O)
+private fun findNextEvent(
+    specificLessons: List<SpecificLesson>,
+    timeScheme: TimeScheme,
+    nowTime: LocalTime
+): Triple<String, String, SpecificLesson?> {
+    if (lessonsHaveEnded(specificLessons, timeScheme, nowTime)) {
+        return Triple("Отдыхай", "", null)
+    }
+
+    val sortedLessons = specificLessons.sortedBy { it.lessonNumber }
+
+    for (i in sortedLessons.indices) {
+        val lesson = sortedLessons[i]
+        val lessonStart = calculateStartTime(lesson, timeScheme, sortedLessons)
+        val lessonEnd = lessonStart.plusMinutes(timeScheme.lessonLength.toLong())
+
+        if (nowTime >= lessonStart && nowTime < lessonEnd) {
+            val secondsUntilEnd = ChronoUnit.SECONDS.between(nowTime, lessonEnd)
+            return Triple(formatTime(secondsUntilEnd), "перемены", lesson)
+        }
+
+        if (nowTime < lessonStart) {
+            val secondsUntilStart = ChronoUnit.SECONDS.between(nowTime, lessonStart)
+            return Triple(formatTime(secondsUntilStart), "урока", lesson)
+        }
+
+        if (i < sortedLessons.size - 1) {
+            val nextLesson = sortedLessons[i + 1]
+            val breakEnd = calculateStartTime(nextLesson, timeScheme, sortedLessons)
+            if (nowTime < breakEnd) {
+                val secondsUntilBreakEnd = ChronoUnit.SECONDS.between(nowTime, breakEnd)
+                return Triple(formatTime(secondsUntilBreakEnd), "урока", nextLesson)
+            }
+        }
+    }
+
+    return Triple("Отдыхай", "", null)
+}
+
+@SuppressLint("DefaultLocale")
+@RequiresApi(Build.VERSION_CODES.O)
+private fun formatTime(seconds: Long): String {
+    val hours = seconds / 3600
+    val minutes = (seconds % 3600) / 60
+    val secs = seconds % 60
+    return String.format("%02d:%02d:%02d", hours, minutes, secs)
 }
