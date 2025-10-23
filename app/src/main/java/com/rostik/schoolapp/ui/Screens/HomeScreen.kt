@@ -37,7 +37,6 @@ import androidx.compose.ui.text.withStyle
 import com.rostik.schoolapp.model.data.LessonManager
 import com.rostik.schoolapp.model.data.SpecificLesson
 import com.rostik.schoolapp.model.data.SpecificLessonManager
-import com.rostik.schoolapp.model.data.TimeScheme
 import com.rostik.schoolapp.model.data.TimeSchemeManager
 import kotlinx.coroutines.delay
 import java.time.DayOfWeek
@@ -76,12 +75,11 @@ fun HomeScreen(navController: NavController = rememberNavController()) {
                 val nowDate = LocalDate.now()
                 val nowTime = LocalTime.now()
                 val today = nowDate.dayOfWeek
-                val timeScheme = timeSchemeManager.getTimeScheme()
                 val specificLessonsToday = specificLessonManager.getSpecificLessonsForDay(today)
                     .sortedBy { it.lessonNumber }
 
                 if (specificLessonsToday.isNotEmpty()) {
-                    val nextEvent = findNextEvent(specificLessonsToday, timeScheme, nowTime)
+                    val nextEvent = findNextEvent(specificLessonsToday, timeSchemeManager, nowTime)
                     timeUntilNext.value = nextEvent.first
                     nextEventType.value = nextEvent.second
                     relevantLesson.value = nextEvent.third
@@ -121,7 +119,7 @@ fun HomeScreen(navController: NavController = rememberNavController()) {
             val timeScheme = timeSchemeManager.getTimeScheme()
             val specificLessonsToday = specificLessonManager.getSpecificLessonsForDay(today)
 
-            val showTomorrow = specificLessonsToday.isEmpty() || lessonsHaveEnded(specificLessonsToday, timeScheme, nowTime)
+            val showTomorrow = specificLessonsToday.isEmpty() || lessonsHaveEnded(specificLessonsToday, timeSchemeManager, nowTime)
             val dayToShow = if (showTomorrow) tomorrow else today
             val scheduleTitle = if (showTomorrow) "Расписание на завтра" else "Расписание на сегодня"
 
@@ -205,7 +203,7 @@ fun HomeScreen(navController: NavController = rememberNavController()) {
                                 lessonsForDay.forEach { specificLesson ->
                                     val lesson = lessonManager.getLessonById(specificLesson.lessonId)
                                     if (lesson != null) {
-                                        val startTime = calculateStartTime(specificLesson, timeScheme, lessonsForDay)
+                                        val startTime = timeSchemeManager.getLessonStartTime(specificLesson.lessonNumber)
                                         val endTime = startTime.plusMinutes(timeScheme.lessonLength.toLong())
                                         Text(
                                             text = buildAnnotatedString {
@@ -240,7 +238,7 @@ fun HomeScreen(navController: NavController = rememberNavController()) {
                             val homeworkEntries = lessonManager.getAllLessons()
                                 .filter { it.homework.isNotBlank() }
                                 .mapNotNull { lesson ->
-                                    val daysToNext = calculateDaysToNextLesson(lesson.id, specificLessonManager, nowDate, nowTime, timeScheme)
+                                    val daysToNext = calculateDaysToNextLesson(lesson.id, specificLessonManager, nowDate, nowTime, timeSchemeManager)
                                     if (daysToNext >= 0) lesson to daysToNext else null
                                 }
                                 .sortedBy { it.second }
@@ -274,31 +272,14 @@ fun HomeScreen(navController: NavController = rememberNavController()) {
 @RequiresApi(Build.VERSION_CODES.O)
 private fun lessonsHaveEnded(
     specificLessons: List<SpecificLesson>,
-    timeScheme: TimeScheme,
+    timeSchemeManager: TimeSchemeManager,
     nowTime: LocalTime
 ): Boolean {
     if (specificLessons.isEmpty()) return true
     val lastLesson = specificLessons.maxByOrNull { it.lessonNumber } ?: return true
-    val startTime = calculateStartTime(lastLesson, timeScheme, specificLessons)
-    val endTime = startTime.plusMinutes(timeScheme.lessonLength.toLong())
+    val startTime = timeSchemeManager.getLessonStartTime(lastLesson.lessonNumber)
+    val endTime = startTime.plusMinutes(timeSchemeManager.getTimeScheme().lessonLength.toLong())
     return nowTime.isAfter(endTime)
-}
-
-@RequiresApi(Build.VERSION_CODES.O)
-private fun calculateStartTime(
-    specificLesson: SpecificLesson,
-    timeScheme: TimeScheme,
-    lessonsForDay: List<SpecificLesson>
-): LocalTime {
-    val index = lessonsForDay.sortedBy { it.lessonNumber }.indexOfFirst { it.id == specificLesson.id }
-    var currentTime = timeScheme.start
-    for (j in 0 until index) {
-        currentTime = currentTime.plusMinutes(timeScheme.lessonLength.toLong())
-        val breakIndex = j
-        val breakDuration = if (breakIndex < timeScheme.breaks.size) timeScheme.breaks[breakIndex] else timeScheme.defaultBreak
-        currentTime = currentTime.plusMinutes(breakDuration.toLong())
-    }
-    return currentTime
 }
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -307,13 +288,13 @@ private fun calculateDaysToNextLesson(
     specificLessonManager: SpecificLessonManager,
     nowDate: LocalDate,
     nowTime: LocalTime,
-    timeScheme: TimeScheme
+    timeSchemeManager: TimeSchemeManager
 ): Int {
     val today = nowDate.dayOfWeek
     val todaySpecs = specificLessonManager.getSpecificLessonsForDay(today).filter { it.lessonId == lessonId }
     if (todaySpecs.isNotEmpty()) {
         val futureToday = todaySpecs.any { spec ->
-            val startTime = calculateStartTime(spec, timeScheme, specificLessonManager.getSpecificLessonsForDay(today))
+            val startTime = timeSchemeManager.getLessonStartTime(spec.lessonNumber)
             nowTime.isBefore(startTime)
         }
         if (futureToday) return 0
@@ -332,18 +313,19 @@ private fun calculateDaysToNextLesson(
 @RequiresApi(Build.VERSION_CODES.O)
 private fun findNextEvent(
     specificLessons: List<SpecificLesson>,
-    timeScheme: TimeScheme,
+    timeSchemeManager: TimeSchemeManager,
     nowTime: LocalTime
 ): Triple<String, String, SpecificLesson?> {
-    if (lessonsHaveEnded(specificLessons, timeScheme, nowTime)) {
+    if (lessonsHaveEnded(specificLessons, timeSchemeManager, nowTime)) {
         return Triple("Отдыхай", "", null)
     }
 
+    val timeScheme = timeSchemeManager.getTimeScheme()
     val sortedLessons = specificLessons.sortedBy { it.lessonNumber }
 
     for (i in sortedLessons.indices) {
         val lesson = sortedLessons[i]
-        val lessonStart = calculateStartTime(lesson, timeScheme, sortedLessons)
+        val lessonStart = timeSchemeManager.getLessonStartTime(lesson.lessonNumber)
         val lessonEnd = lessonStart.plusMinutes(timeScheme.lessonLength.toLong())
 
         if (nowTime >= lessonStart && nowTime < lessonEnd) {
@@ -358,7 +340,7 @@ private fun findNextEvent(
 
         if (i < sortedLessons.size - 1) {
             val nextLesson = sortedLessons[i + 1]
-            val breakEnd = calculateStartTime(nextLesson, timeScheme, sortedLessons)
+            val breakEnd = timeSchemeManager.getLessonStartTime(nextLesson.lessonNumber)
             if (nowTime < breakEnd) {
                 val secondsUntilBreakEnd = ChronoUnit.SECONDS.between(nowTime, breakEnd)
                 return Triple(formatTime(secondsUntilBreakEnd), "урока", nextLesson)

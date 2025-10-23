@@ -44,6 +44,7 @@ fun TimeSchemeSettingsScreen(timeSchemeManager: TimeSchemeManager) {
     var startTimeSeconds by remember { mutableStateOf(0) }
     var lessonLengthMinutes by remember { mutableStateOf("") }
     val breaksMinutes: SnapshotStateList<Int> = remember { mutableStateListOf() }
+    var isCouple by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         coroutineScope.launch {
@@ -140,6 +141,29 @@ fun TimeSchemeSettingsScreen(timeSchemeManager: TimeSchemeManager) {
                         }
                     )
                     Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Тип занятий",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                    ) {
+                        listOf("Уроки", "Пары").forEachIndexed { index, label ->
+                            SegmentedButton(
+                                shape = SegmentedButtonDefaults.itemShape(
+                                    index = index,
+                                    count = 2
+                                ),
+                                onClick = { isCouple = if(index == 0) false else true },
+                                selected = index == if(isCouple) 1 else 0,
+                                label = { Text(label) }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = lessonLengthMinutes,
                         onValueChange = { value ->
@@ -208,7 +232,7 @@ fun TimeSchemeSettingsScreen(timeSchemeManager: TimeSchemeManager) {
                         ) {
                             Text("Сбросить")
                         }
-                        Spacer(modifier = Modifier.height(64.dp))
+                        Spacer(modifier = Modifier.height(140.dp))
                     }
                 }
             }

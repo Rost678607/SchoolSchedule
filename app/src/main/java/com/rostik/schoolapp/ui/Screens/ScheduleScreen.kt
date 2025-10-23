@@ -28,17 +28,16 @@ import androidx.compose.ui.unit.dp
 import com.rostik.schoolapp.model.data.LessonManager
 import com.rostik.schoolapp.model.data.SpecificLesson
 import com.rostik.schoolapp.model.data.SpecificLessonManager
-import com.rostik.schoolapp.model.data.TimeScheme
 import com.rostik.schoolapp.model.data.TimeSchemeManager
 import java.time.DayOfWeek
-import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun LessonItem(lesson: SpecificLesson, timeScheme: TimeScheme, lessonManager: LessonManager) {
+fun LessonItem(lesson: SpecificLesson, timeSchemeManager: TimeSchemeManager, lessonManager: LessonManager) {
     val lessonObj = lessonManager.getLessonById(lesson.lessonId) ?: return
-    val lessonStartTime = calculateLessonStartTime(lesson.lessonNumber, timeScheme)
+    val timeScheme = timeSchemeManager.getTimeScheme()
+    val lessonStartTime = timeSchemeManager.getLessonStartTime(lesson.lessonNumber)
     val lessonEndTime = lessonStartTime.plusMinutes(timeScheme.lessonLength.toLong())
 
     val formatter = DateTimeFormatter.ofPattern("HH:mm")
@@ -102,21 +101,6 @@ fun LessonItem(lesson: SpecificLesson, timeScheme: TimeScheme, lessonManager: Le
             }
         }
     }
-}
-
-@RequiresApi(Build.VERSION_CODES.O)
-fun calculateLessonStartTime(lessonNumber: Int, timeScheme: TimeScheme): LocalTime {
-    var currentTime = timeScheme.start
-    for (i in 0 until lessonNumber - 1) {
-        currentTime = currentTime.plusMinutes(timeScheme.lessonLength.toLong())
-        val breakDuration = if (i < timeScheme.breaks.size) {
-            timeScheme.breaks[i].toLong()
-        } else {
-            timeScheme.defaultBreak.toLong()
-        }
-        currentTime = currentTime.plusMinutes(breakDuration)
-    }
-    return currentTime
 }
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -194,7 +178,7 @@ fun ScheduleScreen() {
                 }
             } else {
                 items(dayLessons.sortedBy { it.lessonNumber }) { lesson ->
-                    LessonItem(lesson, timeSchemeManager.getTimeScheme(), lessonManager)
+                    LessonItem(lesson, timeSchemeManager, lessonManager)
                 }
             }
         }

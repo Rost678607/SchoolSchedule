@@ -62,4 +62,18 @@ class TimeSchemeManager(private val context: Context) {
         timeScheme.breaks.clear()
         timeScheme.breaks.addAll(breaks)
     }
+
+    fun getLessonStartTime(lessonNumber: Int): LocalTime {
+        var currentTime = timeScheme.start
+        for (i in 0 until lessonNumber - 1) {
+            currentTime = currentTime.plusMinutes(timeScheme.lessonLength.toLong())
+            val breakDuration = if (i < timeScheme.breaks.size) {
+                timeScheme.breaks[i].toLong()
+            } else {
+                timeScheme.defaultBreak.toLong()
+            }
+            currentTime = currentTime.plusMinutes(breakDuration)
+        }
+        return currentTime
+    }
 }
