@@ -43,6 +43,7 @@ fun TimeSchemeSettingsScreen(timeSchemeManager: TimeSchemeManager) {
 
     var startTimeSeconds by remember { mutableStateOf(0) }
     var lessonLengthMinutes by remember { mutableStateOf("") }
+    var coupleMiddleBreakMinutes by remember { mutableStateOf("") }
     val breaksMinutes: SnapshotStateList<Int> = remember { mutableStateListOf() }
     var isCouple by remember { mutableStateOf(false) }
 
@@ -53,8 +54,10 @@ fun TimeSchemeSettingsScreen(timeSchemeManager: TimeSchemeManager) {
             timeScheme?.let { scheme ->
                 startTimeSeconds = scheme.start.toSecondOfDay()
                 lessonLengthMinutes = scheme.lessonLength.toString()
+                coupleMiddleBreakMinutes = scheme.coupleMiddleBreakLength.toString()
                 breaksMinutes.clear()
                 breaksMinutes.addAll(scheme.breaks)
+                isCouple = scheme.isPairMode
             }
         }
     }
@@ -71,8 +74,10 @@ fun TimeSchemeSettingsScreen(timeSchemeManager: TimeSchemeManager) {
                     timeScheme?.let { scheme ->
                         startTimeSeconds = scheme.start.toSecondOfDay()
                         lessonLengthMinutes = scheme.lessonLength.toString()
+                        coupleMiddleBreakMinutes = scheme.coupleMiddleBreakLength.toString()
                         breaksMinutes.clear()
                         breaksMinutes.addAll(scheme.breaks)
+                        isCouple = scheme.isPairMode
                     }
                     errorMessage = null
                     showResetDialog = false
@@ -155,7 +160,13 @@ fun TimeSchemeSettingsScreen(timeSchemeManager: TimeSchemeManager) {
                                     index = index,
                                     count = 2
                                 ),
-                                onClick = { isCouple = if(index == 0) false else true },
+                                onClick = {
+                                    isCouple = index == 1
+                                    coroutineScope.launch {
+                                        timeSchemeManager.updateTimeScheme(isPairMode = isCouple)
+                                        timeSchemeManager.apply()
+                                    }
+                                },
                                 selected = index == if(isCouple) 1 else 0,
                                 label = { Text(label) }
                             )
@@ -183,7 +194,7 @@ fun TimeSchemeSettingsScreen(timeSchemeManager: TimeSchemeManager) {
                                 errorMessage = "Только цифры"
                             }
                         },
-                        label = { Text("Длительность урока (минуты)") },
+                        label = { Text(if (isCouple) "Длительность половины пары (минуты)" else "Длительность урока (минуты)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         isError = errorMessage != null,
                         supportingText = {
@@ -191,6 +202,35 @@ fun TimeSchemeSettingsScreen(timeSchemeManager: TimeSchemeManager) {
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
+                    if (isCouple) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = coupleMiddleBreakMinutes,
+                            onValueChange = { value ->
+                                if (value.all { char -> char.isDigit() } || value.isEmpty()) {
+                                    coupleMiddleBreakMinutes = value
+                                    errorMessage = null
+                                    if (value.isNotEmpty() && value.toIntOrNull() != null && value.toInt() > 0) {
+                                        coroutineScope.launch {
+                                            timeSchemeManager.updateTimeScheme(
+                                                coupleMiddleBreak = value.toInt()
+                                            )
+                                            timeSchemeManager.apply()
+                                        }
+                                    }
+                                } else {
+                                    errorMessage = "Только цифры"
+                                }
+                            },
+                            label = { Text("Длительность перерыва посреди пары (минуты)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            isError = errorMessage != null,
+                            supportingText = {
+                                errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = "Перерывы",

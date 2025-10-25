@@ -44,6 +44,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.launch
+import java.time.format.DateTimeFormatter
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @RequiresApi(Build.VERSION_CODES.O)
@@ -144,7 +145,7 @@ fun HomeScreen(navController: NavController = rememberNavController()) {
                             )
                         } else {
                             Text(
-                                text = "До ${nextEventType.value}:",
+                                text = if (timeScheme.isPairMode) "До ${nextEventType.value}:" else "До ${nextEventType.value}:",
                                 fontSize = 26.sp,
                                 modifier = Modifier.padding(bottom = 4.dp)
                             )
@@ -204,13 +205,25 @@ fun HomeScreen(navController: NavController = rememberNavController()) {
                                     val lesson = lessonManager.getLessonById(specificLesson.lessonId)
                                     if (lesson != null) {
                                         val startTime = timeSchemeManager.getLessonStartTime(specificLesson.lessonNumber)
-                                        val endTime = startTime.plusMinutes(timeScheme.lessonLength.toLong())
+                                        val firstHalfEnd = startTime.plusMinutes(timeScheme.lessonLength.toLong())
+                                        val middleBreakEnd = if (timeScheme.isPairMode) firstHalfEnd.plusMinutes(timeScheme.coupleMiddleBreakLength.toLong()) else firstHalfEnd
+                                        val secondHalfEnd = if (timeScheme.isPairMode) middleBreakEnd.plusMinutes(timeScheme.lessonLength.toLong()) else firstHalfEnd
+
+                                        val formatter = DateTimeFormatter.ofPattern("HH:mm")
+                                        val firstHalf = "${startTime.format(formatter)} - ${firstHalfEnd.format(formatter)}"
+                                        val secondHalf = if (timeScheme.isPairMode) "${middleBreakEnd.format(formatter)} - ${secondHalfEnd.format(formatter)}" else ""
+
                                         Text(
                                             text = buildAnnotatedString {
                                                 withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
                                                     append("${specificLesson.lessonNumber}. ${lesson.name}")
                                                 }
-                                                append(" (${lesson.teacher}) - ${specificLesson.cabinet} ${specificLesson.additionalInfo} (${startTime} - ${endTime})")
+                                                append(" (${lesson.teacher}) - ${specificLesson.cabinet} ${specificLesson.additionalInfo}")
+                                                if (timeScheme.isPairMode) {
+                                                    append(" ($firstHalf, $secondHalf)")
+                                                } else {
+                                                    append(" ($firstHalf)")
+                                                }
                                             },
                                             fontSize = 16.sp,
                                             modifier = Modifier.padding(top = 4.dp)
@@ -278,7 +291,7 @@ private fun lessonsHaveEnded(
     if (specificLessons.isEmpty()) return true
     val lastLesson = specificLessons.maxByOrNull { it.lessonNumber } ?: return true
     val startTime = timeSchemeManager.getLessonStartTime(lastLesson.lessonNumber)
-    val endTime = startTime.plusMinutes(timeSchemeManager.getTimeScheme().lessonLength.toLong())
+    val endTime = startTime.plusMinutes(timeSchemeManager.getFullLessonDuration().toLong())
     return nowTime.isAfter(endTime)
 }
 
@@ -316,35 +329,36 @@ private fun findNextEvent(
     timeSchemeManager: TimeSchemeManager,
     nowTime: LocalTime
 ): Triple<String, String, SpecificLesson?> {
-    if (lessonsHaveEnded(specificLessons, timeSchemeManager, nowTime)) {
-        return Triple("Отдыхай", "", null)
-    }
-
     val timeScheme = timeSchemeManager.getTimeScheme()
+    val isPairMode = timeScheme.isPairMode
+    val halfDuration = timeScheme.lessonLength.toLong()
+    val middleDuration = timeScheme.coupleMiddleBreakLength.toLong()
     val sortedLessons = specificLessons.sortedBy { it.lessonNumber }
 
-    for (i in sortedLessons.indices) {
-        val lesson = sortedLessons[i]
+    for (lesson in sortedLessons) {
         val lessonStart = timeSchemeManager.getLessonStartTime(lesson.lessonNumber)
-        val lessonEnd = lessonStart.plusMinutes(timeScheme.lessonLength.toLong())
-
-        if (nowTime >= lessonStart && nowTime < lessonEnd) {
-            val secondsUntilEnd = ChronoUnit.SECONDS.between(nowTime, lessonEnd)
-            return Triple(formatTime(secondsUntilEnd), "перемены", lesson)
-        }
+        val firstHalfEnd = lessonStart.plusMinutes(halfDuration)
+        val middleBreakEnd = if (isPairMode) firstHalfEnd.plusMinutes(middleDuration) else firstHalfEnd
+        val secondHalfEnd = if (isPairMode) middleBreakEnd.plusMinutes(halfDuration) else firstHalfEnd
 
         if (nowTime < lessonStart) {
             val secondsUntilStart = ChronoUnit.SECONDS.between(nowTime, lessonStart)
-            return Triple(formatTime(secondsUntilStart), "урока", lesson)
+            return Triple(formatTime(secondsUntilStart), if (isPairMode) "пары" else "урока", lesson)
         }
 
-        if (i < sortedLessons.size - 1) {
-            val nextLesson = sortedLessons[i + 1]
-            val breakEnd = timeSchemeManager.getLessonStartTime(nextLesson.lessonNumber)
-            if (nowTime < breakEnd) {
-                val secondsUntilBreakEnd = ChronoUnit.SECONDS.between(nowTime, breakEnd)
-                return Triple(formatTime(secondsUntilBreakEnd), "урока", nextLesson)
-            }
+        if (nowTime >= lessonStart && nowTime < firstHalfEnd) {
+            val secondsUntilFirstEnd = ChronoUnit.SECONDS.between(nowTime, firstHalfEnd)
+            return Triple(formatTime(secondsUntilFirstEnd), if (isPairMode) "перерыва" else "перемены", lesson)
+        }
+
+        if (isPairMode && nowTime >= firstHalfEnd && nowTime < middleBreakEnd) {
+            val secondsUntilMiddleEnd = ChronoUnit.SECONDS.between(nowTime, middleBreakEnd)
+            return Triple(formatTime(secondsUntilMiddleEnd), "пары", lesson)
+        }
+
+        if (nowTime >= middleBreakEnd && nowTime < secondHalfEnd) {
+            val secondsUntilSecondEnd = ChronoUnit.SECONDS.between(nowTime, secondHalfEnd)
+            return Triple(formatTime(secondsUntilSecondEnd), "перемены", lesson)
         }
     }
 

@@ -46,12 +46,16 @@ class TimeSchemeManager(private val context: Context) {
         start: LocalTime? = null,
         lessonLength: Int? = null,
         breaks: MutableList<Int>? = null,
-        defaultBreak: Int? = null
+        defaultBreak: Int? = null,
+        coupleMiddleBreak: Int? = null,
+        isPairMode: Boolean? = null
     ) {
         start?.let { timeScheme.start = it }
         lessonLength?.let { timeScheme.lessonLength = it }
         breaks?.let { timeScheme.breaks.clear(); timeScheme.breaks.addAll(it) }
         defaultBreak?.let { timeScheme.defaultBreak = it }
+        coupleMiddleBreak?.let { timeScheme.coupleMiddleBreakLength = it }
+        isPairMode?.let { timeScheme.isPairMode = it }
     }
 
     fun resetToDefault() {
@@ -63,10 +67,18 @@ class TimeSchemeManager(private val context: Context) {
         timeScheme.breaks.addAll(breaks)
     }
 
+    fun getFullLessonDuration(): Int {
+        return if (timeScheme.isPairMode) {
+            timeScheme.lessonLength * 2 + timeScheme.coupleMiddleBreakLength
+        } else {
+            timeScheme.lessonLength
+        }
+    }
+
     fun getLessonStartTime(lessonNumber: Int): LocalTime {
         var currentTime = timeScheme.start
         for (i in 0 until lessonNumber - 1) {
-            currentTime = currentTime.plusMinutes(timeScheme.lessonLength.toLong())
+            currentTime = currentTime.plusMinutes(getFullLessonDuration().toLong())
             val breakDuration = if (i < timeScheme.breaks.size) {
                 timeScheme.breaks[i].toLong()
             } else {

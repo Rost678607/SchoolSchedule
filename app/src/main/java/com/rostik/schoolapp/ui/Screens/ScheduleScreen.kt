@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -38,11 +39,15 @@ fun LessonItem(lesson: SpecificLesson, timeSchemeManager: TimeSchemeManager, les
     val lessonObj = lessonManager.getLessonById(lesson.lessonId) ?: return
     val timeScheme = timeSchemeManager.getTimeScheme()
     val lessonStartTime = timeSchemeManager.getLessonStartTime(lesson.lessonNumber)
-    val lessonEndTime = lessonStartTime.plusMinutes(timeScheme.lessonLength.toLong())
+    val firstHalfEnd = lessonStartTime.plusMinutes(timeScheme.lessonLength.toLong())
+    val middleBreakEnd = if (timeScheme.isPairMode) firstHalfEnd.plusMinutes(timeScheme.coupleMiddleBreakLength.toLong()) else firstHalfEnd
+    val secondHalfEnd = if (timeScheme.isPairMode) middleBreakEnd.plusMinutes(timeScheme.lessonLength.toLong()) else firstHalfEnd
 
     val formatter = DateTimeFormatter.ofPattern("HH:mm")
-    val startTimeText = lessonStartTime.format(formatter)
-    val endTimeText = lessonEndTime.format(formatter)
+    val startStr = lessonStartTime.format(formatter)
+    val firstEndStr = firstHalfEnd.format(formatter)
+    val middleEndStr = if (timeScheme.isPairMode) middleBreakEnd.format(formatter) else ""
+    val secondEndStr = if (timeScheme.isPairMode) secondHalfEnd.format(formatter) else ""
 
     Card(
         modifier = Modifier
@@ -90,14 +95,34 @@ fun LessonItem(lesson: SpecificLesson, timeSchemeManager: TimeSchemeManager, les
                     .padding(start = 8.dp),
                 horizontalAlignment = Alignment.End
             ) {
-                Text(
-                    text = startTimeText,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    text = endTimeText,
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                if (timeScheme.isPairMode) {
+                    Text(
+                        text = startStr,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = firstEndStr,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = middleEndStr,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = secondEndStr,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                } else {
+                    Text(
+                        text = startStr,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = firstEndStr,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
             }
         }
     }
