@@ -42,6 +42,13 @@ fun SettingsScreen(navController: NavHostController) {
                 onClick = { navController.navigate("settings/time_scheme") }
             )
         }
+        item {
+            SettingItem(
+                text = "Обмен",
+                description = "Экспорт/импорт настроек",
+                onClick = { navController.navigate("settings/share") }
+            )
+        }
     }
 }
 

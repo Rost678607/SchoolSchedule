@@ -59,6 +59,11 @@ class SpecificLessonManager(private val context: Context) {
         specificLessons.removeIf { it.id == id }
     }
 
+    fun replaceAll(newSpecificLessons: List<SpecificLesson>) {
+        specificLessons.clear()
+        specificLessons.addAll(newSpecificLessons)
+    }
+
     fun getAllSpecificLessons(): List<SpecificLesson> = specificLessons.toList()
 
     fun getSpecificLessonsForDay(day: DayOfWeek): List<SpecificLesson> {

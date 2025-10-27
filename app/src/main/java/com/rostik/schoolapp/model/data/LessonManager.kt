@@ -70,6 +70,11 @@ class LessonManager(private val context: Context) {
         lessons.removeIf { it.id == id }
     }
 
+    fun replaceAll(newLessons: List<Lesson>) {
+        lessons.clear()
+        lessons.addAll(newLessons)
+    }
+
     fun getAllLessons(): List<Lesson> = lessons.toList()
 
     fun getLessonById(id: Int): Lesson? {

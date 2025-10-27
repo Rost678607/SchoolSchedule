@@ -48,6 +48,7 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector?
     object LessonsSettings : Screen("settings/lessons", "Расписание уроков")
     object TimeSchemeSettings : Screen("settings/time_scheme", "Расписание звонков")
     object Homework : Screen("homework", "Домашнее задание")
+    object ShareSettings : Screen("settings/share", "Обмен настройками")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -64,14 +65,15 @@ fun NavigableApp(context: Context) {
     val currentRoute = navBackStackEntry?.destination?.route
 
     // Определение заголовка в зависимости от текущего маршрута
-    val title = when {
-        currentRoute == Screen.Home.route -> Screen.Home.title
-        currentRoute == Screen.Schedule.route -> Screen.Schedule.title
-        currentRoute == Screen.Settings.route -> Screen.Settings.title
-        currentRoute == Screen.LessonsListSettings.route -> Screen.LessonsListSettings.title
-        currentRoute == Screen.LessonsSettings.route -> Screen.LessonsSettings.title
-        currentRoute == Screen.TimeSchemeSettings.route -> Screen.TimeSchemeSettings.title
-        currentRoute == Screen.Homework.route -> Screen.Homework.title
+    val title = when(currentRoute) {
+        Screen.Home.route -> Screen.Home.title
+        Screen.Schedule.route -> Screen.Schedule.title
+        Screen.Settings.route -> Screen.Settings.title
+        Screen.LessonsListSettings.route -> Screen.LessonsListSettings.title
+        Screen.LessonsSettings.route -> Screen.LessonsSettings.title
+        Screen.TimeSchemeSettings.route -> Screen.TimeSchemeSettings.title
+        Screen.Homework.route -> Screen.Homework.title
+        Screen.ShareSettings.route -> Screen.ShareSettings.title
         else -> { "" }
     }
 
@@ -84,7 +86,8 @@ fun NavigableApp(context: Context) {
                     Screen.LessonsListSettings.route,
                     Screen.LessonsSettings.route,
                     Screen.TimeSchemeSettings.route,
-                    Screen.Homework.route
+                    Screen.Homework.route,
+                    Screen.ShareSettings.route
                 )
             ) {
                 TopAppBar(
@@ -166,6 +169,13 @@ fun NavigableApp(context: Context) {
                 popEnterTransition = { fadeIn(tween(0)) },
                 popExitTransition = { fadeOut(tween(0)) }
             ) { HomeworkScreen(lessonManager = lessonManager) }
+            composable(
+                route = Screen.ShareSettings.route,
+                enterTransition = { fadeIn(tween(0)) },
+                exitTransition = { fadeOut(tween(0)) },
+                popEnterTransition = { fadeIn(tween(0)) },
+                popExitTransition = { fadeOut(tween(0)) }
+            ) { ShareSettingsScreen(lessonManager = lessonManager, specificLessonManager = specificLessonManager, timeSchemeManager = timeSchemeManager) }
         }
     }
 }

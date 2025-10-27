@@ -62,6 +62,10 @@ class TimeSchemeManager(private val context: Context) {
         timeScheme = TimeScheme()
     }
 
+    fun replace(timeScheme: TimeScheme) {
+        this.timeScheme = timeScheme
+    }
+
     fun setBreaks(breaks: List<Int>) {
         timeScheme.breaks.clear()
         timeScheme.breaks.addAll(breaks)
