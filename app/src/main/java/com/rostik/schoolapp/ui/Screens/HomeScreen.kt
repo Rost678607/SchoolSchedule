@@ -271,6 +271,11 @@ fun HomeScreen(navController: NavController = rememberNavController()) {
                                     )
                                 }
                             }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text( // Я пол дня бился над этим, но по итогу решил временно забить и тупо влепил предупреждалку
+                                text = "На данный момент разработчик не рекомендует хранить домашнее задание только здесь, так как оно безвозвратно пропадает при импорте расписания",
+                                fontSize = 8.sp
+                            )
                         }
                     }
                 }
