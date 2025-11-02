@@ -13,8 +13,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val initialUri = if (intent?.action == android.content.Intent.ACTION_VIEW) intent.data else null
         setContent {
-            NavigableApp(applicationContext)
+            NavigableApp(applicationContext, initialUri)
         }
     }
 }

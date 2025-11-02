@@ -24,7 +24,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -36,6 +38,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.material3.MaterialTheme
+import android.net.Uri
+import android.widget.Toast
+import com.rostik.schoolapp.model.ShareManager
 import com.rostik.schoolapp.model.data.LessonManager
 import com.rostik.schoolapp.model.data.SpecificLessonManager
 import com.rostik.schoolapp.model.data.TimeSchemeManager
@@ -54,11 +59,12 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector?
 @OptIn(ExperimentalMaterial3Api::class)
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun NavigableApp(context: Context) {
+fun NavigableApp(context: Context, initialUri: Uri? = null) {
     // Инициализация менеджеров данных
     val lessonManager = LessonManager(context)
     val specificLessonManager = SpecificLessonManager(context)
     val timeSchemeManager = TimeSchemeManager(context)
+    val shareManager = remember { ShareManager(context, lessonManager, specificLessonManager, timeSchemeManager) }
 
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -75,6 +81,22 @@ fun NavigableApp(context: Context) {
         Screen.Homework.route -> Screen.Homework.title
         Screen.ShareSettings.route -> Screen.ShareSettings.title
         else -> { "" }
+    }
+
+    LaunchedEffect(initialUri) {
+        if (initialUri != null) {
+            if (shareManager.isValidFile(initialUri)) {
+                navController.navigate(Screen.ShareSettings.route) {
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            } else {
+                Toast.makeText(context, "Неверный формат файла", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     Scaffold(
@@ -175,7 +197,13 @@ fun NavigableApp(context: Context) {
                 exitTransition = { fadeOut(tween(0)) },
                 popEnterTransition = { fadeIn(tween(0)) },
                 popExitTransition = { fadeOut(tween(0)) }
-            ) { ShareSettingsScreen(lessonManager = lessonManager, specificLessonManager = specificLessonManager, timeSchemeManager = timeSchemeManager) }
+            ) { ShareSettingsScreen(
+                lessonManager = lessonManager,
+                specificLessonManager = specificLessonManager,
+                timeSchemeManager = timeSchemeManager,
+                shareManager = shareManager,
+                initialUri = initialUri
+            ) }
         }
     }
 }

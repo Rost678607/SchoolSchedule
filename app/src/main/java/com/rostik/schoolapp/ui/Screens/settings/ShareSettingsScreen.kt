@@ -24,15 +24,23 @@ import kotlinx.coroutines.launch
 fun ShareSettingsScreen(
     lessonManager: LessonManager,
     specificLessonManager: SpecificLessonManager,
-    timeSchemeManager: TimeSchemeManager
+    timeSchemeManager: TimeSchemeManager,
+    shareManager: ShareManager,
+    initialUri: Uri? = null
 ) {
     val context = LocalContext.current
-    val shareManager = remember { ShareManager(context, lessonManager, specificLessonManager, timeSchemeManager) }
     val coroutineScope = rememberCoroutineScope()
 
     var showExportDialog by remember { mutableStateOf(false) }
     var showImportConfirmation by remember { mutableStateOf(false) }
     var selectedImportUri by remember { mutableStateOf<Uri?>(null) }
+
+    LaunchedEffect(initialUri) {
+        if (initialUri != null) {
+            selectedImportUri = initialUri
+            showImportConfirmation = true
+        }
+    }
 
     val saveLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("*/*")
