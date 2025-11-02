@@ -145,19 +145,6 @@ fun ScheduleScreen() {
         timeSchemeManager.load()
         specificLessons = specificLessonManager.getAllSpecificLessons()
         isLoading = false
-
-        if (specificLessons.isEmpty()) {
-            val lesson = lessonManager.addLesson("Математика", "Иванов И.И.")
-            specificLessonManager.addSpecificLesson(
-                day = DayOfWeek.MONDAY,
-                lessonNumber = 1,
-                lesson = lesson,
-                cabinet = "101",
-                additionalInfo = "Тест"
-            )
-            specificLessonManager.apply()
-            specificLessons = specificLessonManager.getAllSpecificLessons()
-        }
     }
 
     if (isLoading) {
